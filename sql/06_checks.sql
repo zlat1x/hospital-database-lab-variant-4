@@ -3,7 +3,7 @@ BEGIN;
 SET search_path=hospital,public;
 CALL sp_set_actor(1);
 DO $$
-DECLARE p bigint; a bigint; e bigint; rx bigint; adm bigint; stamp timestamptz; failed_id bigint;
+DECLARE p bigint; a bigint; e bigint; rx bigint; adm bigint; check_bed bigint; stamp timestamptz; failed_id bigint;
 BEGIN
  CALL sp_create_patient('CHECK-ROLLBACK','Test','Checks','2000-01-01',NULL,p);
  ASSERT EXISTS(SELECT 1 FROM v_patients WHERE id=p),'create patient';
@@ -49,9 +49,12 @@ BEGIN
  ASSERT EXISTS(SELECT 1 FROM v_prescription_items WHERE prescription_id=rx),'prescription item';
  CALL sp_delete_prescription(rx);
  ASSERT NOT EXISTS(SELECT 1 FROM v_prescription_items WHERE prescription_id=rx),'prescription archive';
- CALL sp_admit_patient(p,1,2,'2090-01-01 12:00+00',adm);
+ INSERT INTO bed(room_id,bed_number)
+ VALUES ((SELECT id FROM room ORDER BY id LIMIT 1),'CHECK-' || txid_current()::text)
+ RETURNING id INTO check_bed;
+ CALL sp_admit_patient(p,1,check_bed,'2090-01-01 12:00+00',adm);
  BEGIN
-  CALL sp_admit_patient(p,1,2,'2090-01-01 13:00+00',failed_id);
+  CALL sp_admit_patient(p,1,check_bed,'2090-01-01 13:00+00',failed_id);
   RAISE EXCEPTION 'Expected admission overlap rejection';
  EXCEPTION WHEN exclusion_violation THEN NULL; END;
  CALL sp_discharge_patient(adm,'2090-01-03 12:00+00');
