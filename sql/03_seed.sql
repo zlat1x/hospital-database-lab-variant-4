@@ -1,0 +1,25 @@
+-- Synthetic data only. Run once after 01 and 02.
+BEGIN;
+SET search_path=hospital,public;
+INSERT INTO app_user(username,display_name) VALUES ('registrar','Навчальний реєстратор'),('doctor_demo','Навчальний лікар');
+INSERT INTO department(name) VALUES ('Терапевтичне'),('Діагностичне');
+INSERT INTO specialty(name) VALUES ('Терапія'),('Сімейна медицина');
+INSERT INTO doctor(department_id,user_id,license_number,first_name,last_name) VALUES(1,2,'DEMO-LIC-001','Олена','Демонстраційна');
+INSERT INTO doctor_specialty VALUES(1,1),(1,2);
+INSERT INTO room(department_id,room_number) VALUES(1,'101');
+INSERT INTO bed(room_id,bed_number) VALUES(1,'A'),(1,'B');
+INSERT INTO diagnosis(code,name) VALUES('DEMO-01','Навчальний діагноз'),('DEMO-02','Додатковий навчальний діагноз');
+INSERT INTO medication(name,form,strength) VALUES('Навчальний препарат','Навчальна форма','DEMO');
+INSERT INTO lab_test(code,name,unit) VALUES('DEMO-LAB','Навчальний показник','ум. од.');
+CALL sp_set_actor(1);
+CALL sp_create_patient('DEMO-0001','Тест','Пацієнт','2000-01-01','0000000000',NULL);
+CALL sp_book_appointment(1,1,'2026-01-15 10:00+02','2026-01-15 10:30+02',NULL);
+CALL sp_complete_appointment(1,'Навчальний огляд; demo observation.',NULL);
+CALL sp_add_diagnosis(1,1,true);
+CALL sp_create_prescription(1,NULL);
+CALL sp_add_prescription_item(1,1,'Навчальна доза','Лише демонстрація',1);
+CALL sp_admit_patient(1,1,1,'2026-01-15 12:00+02',NULL);
+CALL sp_discharge_patient(1,'2026-01-17 12:00+02');
+INSERT INTO lab_order(encounter_id) VALUES(1);
+INSERT INTO lab_order_item VALUES(1,1,'Навчальний результат','2026-01-15 11:00+02');
+COMMIT;
