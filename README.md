@@ -63,4 +63,4 @@ cmd /c "docker compose exec -T db psql -U hospital_app -d hospital -v ON_ERROR_S
 
 Для перегляду через pgAdmin: host `127.0.0.1`, port `5435`, database `hospital`, user `postgres`, пароль із `.env`.
 
-> Роль `hospital_app` і пароль `lab_demo_only` призначені лише для навчальної демонстрації. Не використовуйте їх у реальному застосунку. SQL-скрипти ініціалізації автоматично виконуються тільки для нового Docker volume; `docker compose down -v` видаляє збережені дані.
+SQL-скрипти ініціалізації автоматично виконуються тільки для нового Docker volume; `docker compose down -v` видаляє збережені дані.
