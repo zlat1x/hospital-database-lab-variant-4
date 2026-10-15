@@ -1,0 +1,214 @@
+// ER diagram for https://dbdiagram.io/home (paste or import this DBML).
+// PostgreSQL schema: hospital. Source of SQL constraints: sql/01_schema.sql.
+Project hospital_lab {
+ database_type: 'PostgreSQL'
+ Note: 'Variant 4. Hospital management. 20 tables, PK/FK/UNIQUE/NOT NULL. Additional CHECK, triggers, exclusion constraints and indexes are implemented in SQL.'
+}
+Table hospital.admission {
+  Note: 'GiST exclusion constraints prohibit overlapping stays per bed or patient.'
+  id bigint [pk, not null, increment]
+  patient_id bigint [not null]
+  doctor_id bigint [not null]
+  bed_id bigint [not null]
+  admitted_at timestamptz [not null]
+  discharged_at timestamptz
+  updated_at timestamptz [not null, default: `clock_timestamp()`]
+  updated_by bigint [not null]
+}
+
+Table hospital.app_user {
+  id bigint [pk, not null, increment]
+  username text [not null, unique]
+  display_name text [not null]
+  is_active boolean [not null, default: `true`]
+}
+
+Table hospital.appointment {
+  Note: 'Soft delete on cancellation. GiST exclusion constraints prohibit overlapping active slots of the same doctor or patient.'
+  id bigint [pk, not null, increment]
+  patient_id bigint [not null]
+  doctor_id bigint [not null]
+  starts_at timestamptz [not null]
+  ends_at timestamptz [not null]
+  status text [not null, default: `'booked'::text`]
+  is_deleted boolean [not null, default: `false`]
+  deleted_at timestamptz
+  updated_at timestamptz [not null, default: `clock_timestamp()`]
+  updated_by bigint [not null]
+}
+
+Table hospital.audit_log {
+  Note: 'Polymorphic audit event: table_name + row_id are intentionally not an ordinary foreign key.'
+  id bigint [pk, not null, increment]
+  table_name text [not null]
+  row_id bigint [not null]
+  operation text [not null]
+  changed_at timestamptz [not null, default: `clock_timestamp()`]
+  changed_by bigint [not null]
+  old_data jsonb
+  new_data jsonb [not null]
+}
+
+Table hospital.bed {
+  id bigint [pk, not null, increment]
+  room_id bigint [not null]
+  bed_number text [not null]
+  indexes {
+    (room_id, bed_number) [unique]
+  }
+}
+
+Table hospital.department {
+  id bigint [pk, not null, increment]
+  name text [not null, unique]
+}
+
+Table hospital.diagnosis {
+  id bigint [pk, not null, increment]
+  code text [not null, unique]
+  name text [not null]
+}
+
+Table hospital.doctor {
+  id bigint [pk, not null, increment]
+  department_id bigint [not null]
+  user_id bigint [not null, unique]
+  license_number text [not null, unique]
+  first_name text [not null]
+  last_name text [not null]
+}
+
+Table hospital.doctor_specialty {
+  doctor_id bigint [not null]
+  specialty_id bigint [not null]
+  indexes {
+    (doctor_id, specialty_id) [pk]
+  }
+}
+
+Table hospital.encounter {
+  id bigint [pk, not null, increment]
+  appointment_id bigint [not null, unique]
+  notes text [not null, default: `''::text`]
+  updated_at timestamptz [not null, default: `clock_timestamp()`]
+  updated_by bigint [not null]
+}
+
+Table hospital.encounter_diagnosis {
+  encounter_id bigint [not null]
+  diagnosis_id bigint [not null]
+  is_primary boolean [not null, default: `false`]
+  indexes {
+    (encounter_id, diagnosis_id) [pk]
+  }
+}
+
+Table hospital.lab_order {
+  id bigint [pk, not null, increment]
+  encounter_id bigint [not null]
+  ordered_at timestamptz [not null, default: `clock_timestamp()`]
+}
+
+Table hospital.lab_order_item {
+  lab_order_id bigint [not null]
+  lab_test_id bigint [not null]
+  result_text text
+  resulted_at timestamptz
+  indexes {
+    (lab_order_id, lab_test_id) [pk]
+  }
+}
+
+Table hospital.lab_test {
+  id bigint [pk, not null, increment]
+  code text [not null, unique]
+  name text [not null]
+  unit text
+}
+
+Table hospital.medication {
+  id bigint [pk, not null, increment]
+  name text [not null]
+  form text [not null]
+  strength text [not null]
+  indexes {
+    (name, form, strength) [unique]
+  }
+}
+
+Table hospital.patient {
+  Note: 'Soft delete: is_deleted / deleted_at; updated_at and updated_by; audit trigger. Medical record number remains unique after archival.'
+  id bigint [pk, not null, increment]
+  medical_record_number text [not null, unique]
+  first_name text [not null]
+  last_name text [not null]
+  birth_date date [not null]
+  phone text
+  is_deleted boolean [not null, default: `false`]
+  deleted_at timestamptz
+  updated_at timestamptz [not null, default: `clock_timestamp()`]
+  updated_by bigint [not null]
+}
+
+Table hospital.prescription {
+  Note: 'Soft delete: is_deleted / deleted_at; auditing of changes.'
+  id bigint [pk, not null, increment]
+  encounter_id bigint [not null]
+  issued_at timestamptz [not null, default: `clock_timestamp()`]
+  is_deleted boolean [not null, default: `false`]
+  deleted_at timestamptz
+  updated_at timestamptz [not null, default: `clock_timestamp()`]
+  updated_by bigint [not null]
+}
+
+Table hospital.prescription_item {
+  prescription_id bigint [not null]
+  medication_id bigint [not null]
+  dosage text [not null]
+  frequency text [not null]
+  duration_days integer [not null]
+  indexes {
+    (prescription_id, medication_id) [pk]
+  }
+}
+
+Table hospital.room {
+  id bigint [pk, not null, increment]
+  department_id bigint [not null]
+  room_number text [not null]
+  indexes {
+    (department_id, room_number) [unique]
+  }
+}
+
+Table hospital.specialty {
+  id bigint [pk, not null, increment]
+  name text [not null, unique]
+}
+
+Ref: hospital.admission.bed_id > hospital.bed.id
+Ref: hospital.admission.doctor_id > hospital.doctor.id
+Ref: hospital.admission.patient_id > hospital.patient.id
+Ref: hospital.admission.updated_by > hospital.app_user.id
+Ref: hospital.appointment.doctor_id > hospital.doctor.id
+Ref: hospital.appointment.patient_id > hospital.patient.id
+Ref: hospital.appointment.updated_by > hospital.app_user.id
+Ref: hospital.audit_log.changed_by > hospital.app_user.id
+Ref: hospital.bed.room_id > hospital.room.id
+Ref: hospital.doctor.department_id > hospital.department.id
+Ref: hospital.app_user.id - hospital.doctor.user_id
+Ref: hospital.doctor_specialty.doctor_id > hospital.doctor.id
+Ref: hospital.doctor_specialty.specialty_id > hospital.specialty.id
+Ref: hospital.appointment.id - hospital.encounter.appointment_id
+Ref: hospital.encounter.updated_by > hospital.app_user.id
+Ref: hospital.encounter_diagnosis.diagnosis_id > hospital.diagnosis.id
+Ref: hospital.encounter_diagnosis.encounter_id > hospital.encounter.id
+Ref: hospital.lab_order.encounter_id > hospital.encounter.id
+Ref: hospital.lab_order_item.lab_order_id > hospital.lab_order.id
+Ref: hospital.lab_order_item.lab_test_id > hospital.lab_test.id
+Ref: hospital.patient.updated_by > hospital.app_user.id
+Ref: hospital.prescription.encounter_id > hospital.encounter.id
+Ref: hospital.prescription.updated_by > hospital.app_user.id
+Ref: hospital.prescription_item.medication_id > hospital.medication.id
+Ref: hospital.prescription_item.prescription_id > hospital.prescription.id
+Ref: hospital.room.department_id > hospital.department.id
